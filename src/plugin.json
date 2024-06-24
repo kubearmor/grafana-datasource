@@ -7,17 +7,30 @@
   "backend": true,
   "executable": "gpx_kubearmor",
   "info": {
-    "description": "A backend datasource for kube armor",
+    "description": "A backend datasource for kubearmor",
     "author": {
       "name": "Accuknox"
+      "url":"https://www.accuknox.com"
     },
-    "keywords": ["datasource"],
+    "keywords": ["datasource",
+"Kubearmor",
+      "Kube",
+      "accu",
+      "Accuknox",
+      "Accu",
+      
+    ],
     "logos": {
-      "small": "img/logo.svg",
-      "large": "img/logo.svg"
+      "small": "img/kubearmor-logo-symbol.svg",
+      "large": "img/kubearmor-logo-symbol.svg"
     },
     "links": [],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name":"Process Nodegraph",
+        "path":"img/kubearmor-plugin.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
