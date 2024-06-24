@@ -9,22 +9,26 @@
   "info": {
     "description": "A backend datasource for kubearmor",
     "author": {
-      "name": "Accuknox"
+      "name": "Accuknox",
       "url":"https://www.accuknox.com"
     },
-    "keywords": ["datasource",
-"Kubearmor",
-      "Kube",
+    "keywords": [
+      "datasource",
+      "kubearmor",
+      "kube",
       "accu",
-      "Accuknox",
-      "Accu",
-      
+      "accuknox"
     ],
     "logos": {
       "small": "img/kubearmor-logo-symbol.svg",
       "large": "img/kubearmor-logo-symbol.svg"
     },
-    "links": [],
+    "links": [
+      {
+        "name": "Website",
+        "url": ""
+      }
+    ],
     "screenshots": [
       {
         "name":"Process Nodegraph",

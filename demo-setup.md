@@ -13,7 +13,6 @@ This video illustrates the steps mentioned above, making the process easier to u
 https://github.com/harisudarsan1/accuknox-kubearmor-datasource/assets/97289088/21b776b7-c809-439b-b723-074cbacf5df2
 
 
-<video src="assets/grafana-nosound.mp4" width="320" height="240" controls></video>
 
 
 
