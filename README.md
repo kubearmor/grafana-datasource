@@ -70,7 +70,7 @@ follow the instructions given in the demo-setup.md
 
 
 ## Contributing
-Follow the instructions provided in the [Contributing.md](Contributing.md) to setup the dev environment.
+Follow the instructions provided in the [Contributing.md](https://github.com/kubearmor/grafana-datasource/blob/main/Contributing.md) to setup the dev environment.
 
 
 
