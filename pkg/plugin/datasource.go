@@ -4,17 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	// "strings"
 
 	"net/http"
-	"strconv"
+	// "strconv"
 
+	"github.com/accuknox/kubearmor/pkg/adapters"
 	"github.com/accuknox/kubearmor/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 )
 
 var (
@@ -28,6 +30,10 @@ const (
 	pts0   = "pts0"
 	denied = "Permission denied"
 )
+
+type BackendService interface {
+	GetLogs(ctx context.Context, qm models.QueryModel, index string) []types.Log
+}
 
 // NewDatasource creates a new datasource instance.
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
@@ -115,7 +121,7 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	var response backend.DataResponse
 
 	// Unmarshal the JSON into our queryModel.
-	var qm queryModel
+	var qm models.QueryModel
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 
@@ -127,7 +133,8 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 		ctxLogger.Info("Query json is sucessfully marshalled operation: ")
 	}
 
-	Nodegraph, _, _ := getGraphData(ctx, d, qm)
+	// Nodegraph, _, _ := getGraphData(ctx, d, qm)
+	Nodegraph := getNodeGraph(ctx, d, qm)
 
 	Nodefields := getNodeFields()
 	EdgeFields := getEdgeFields()
@@ -305,139 +312,49 @@ func getEdgeFields() []*data.Field {
 	return fields
 }
 
-func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryModel) (models.NodeGraph, int, string) {
+func getBackendService(ctx context.Context, backendName string, dsc models.DataStoreConfig) BackendService {
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
-	var endpoint = ""
-	var logs = []models.Log{}
-	var total = 0
+	switch backendName {
 
-	var TTY = ""
-	switch Backend {
 	case "ELASTICSEARCH":
-		endpoint = "/_search?size=1000&pretty"
-		if MyQuery.Operation == "Process" {
-			endpoint = endpoint + "&q=TTY:pts0"
-		} else {
-
-			endpoint = endpoint + "&q=kprobe"
-		}
-
-		datasourceURL := datasource.settings.URL + endpoint
-		// Do HTTP request
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, datasourceURL, nil)
-
+		return nil
+	case "OPENSEARCH":
+		client, err := adapters.NewOpenSearchClient(dsc, true)
 		if err != nil {
-			ctxLogger.Error("request error :", err)
+			ctxLogger.Error("Cannot create opensearch client %v :", err)
 		}
+		return client
 
-		resp, err := datasource.httpClient.Do(req)
-		if err != nil {
-			ctxLogger.Error("load settings: failed to load settings")
-			return models.NodeGraph{}, 0, ""
-		}
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				ctxLogger.Error("check health: failed to close response body", "err", err.Error())
-			}
-		}()
-		var ESResponse models.ElasticsearchResponse
-
-		if err := json.NewDecoder(resp.Body).Decode(&ESResponse); err != nil {
-
-			ctxLogger.Error("Failed to decode json %w", err)
-		}
-		for _, item := range ESResponse.Hits.Hits {
-			ctxLogger.Info(item.Source.Resource)
-			logs = append(logs, item.Source)
-			TTY = item.Source.Operation
-		}
-		total = len(logs)
-		break
-	case "LOKI":
-		endpoint = "/"
-
-		if MyQuery.Operation == "Operation" {
-			endpoint = endpoint + "body_TTY='pts0'|json"
-		} else {
-
-			endpoint = endpoint + "&q=Operation=Network|json"
-		}
-
-		datasourceURL := datasource.settings.URL + endpoint
-		// Do HTTP request
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, datasourceURL, nil)
-
-		if err != nil {
-			fmt.Errorf("request error :%w", err)
-		}
-		resp, err := datasource.httpClient.Do(req)
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				ctxLogger.Error("check health: failed to close response body %w", err.Error())
-			}
-		}()
-		var LokiResponse models.LokiSearchResponse
-		if err := json.NewDecoder(resp.Body).Decode(&LokiResponse); err != nil {
-
-		}
-		for _, item := range LokiResponse.Data.Result {
-			var log = models.Log{}
-			log.UpdatedTime = item.Stream.BodyUpdatedTime
-			log.UpdatedTime = item.Stream.BodyUpdatedTime
-			log.ClusterName = item.Stream.BodyClusterName
-			log.HostName = item.Stream.BodyHostName
-			log.NamespaceName = item.Stream.BodyNamespaceName
-			log.Owner.Name = item.Stream.BodyOwnerName
-			log.Owner.Ref = item.Stream.BodyOwnerRef
-			log.Owner.Namespace = item.Stream.BodyOwnerNamespace
-			log.Labels = item.Stream.BodyLabels
-			log.ContainerID = item.Stream.BodyContainerID
-			log.ContainerName = item.Stream.BodyContainerName
-			log.ContainerImage = item.Stream.BodyContainerImage
-			log.ParentProcessName = item.Stream.BodyParentProcessName
-			log.ProcessName = item.Stream.BodyProcessName
-			log.HostPPID = convertToInt(item.Stream.BodyHostPPID)
-			log.HostPID = convertToInt(item.Stream.BodyHostPID)
-			log.PPID = convertToInt(item.Stream.BodyPPID)
-			log.PID = convertToInt(item.Stream.BodyPID)
-			log.UID = convertToInt(item.Stream.BodyUID)
-			log.Type = item.Stream.BodyType
-			log.Source = item.Stream.BodySource
-			log.Operation = item.Stream.BodyOperation
-			log.Resource = item.Stream.BodyResource
-			log.Data = item.Stream.BodyData
-			log.Result = item.Stream.BodyResult
-			log.Cwd = item.Stream.BodyCwd
-
-			if item.Stream.BodyTTY != "" && MyQuery.Operation == "Process" {
-				log.TTY = item.Stream.BodyTTY
-			}
-			logs = append(logs, log)
-		}
-
-		break
 	}
-
-	var NodeGraphData models.NodeGraph
-	switch MyQuery.Operation {
-	case "Process":
-		NodeGraphData = getProcessGraph(logs, MyQuery)
-		break
-	case "Network":
-
-		NodeGraphData = getNetworkGraph(ctxLogger, logs, MyQuery, datasource)
-		break
-	}
-
-	return NodeGraphData, total, TTY
+	return nil
 }
 
-func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
+func getNodeGraph(ctx context.Context, datasource *Datasource, qm models.QueryModel) models.NodeGraph {
+	datastoreConfig := models.DataStoreConfig{
+		URL:      datasource.settings.URL,
+		Username: datasource.settings.User,
+		Password: "",
+	}
+	service := getBackendService(ctx, Backend, datastoreConfig)
+	// GetLogs gets the KubeArmor logs from the respective datastore
+	logs := service.GetLogs(ctx, qm, "test_alert")
+
+	ctxLogger := log.DefaultLogger.FromContext(ctx)
+	ctxLogger.Info(fmt.Sprintf("received logs with len: %d", len(logs)))
+
+	if qm.Operation == "Process" {
+		return getProcessGraph(logs, qm)
+	}
+
+	return models.NodeGraph{}
+}
+
+func getProcessGraph(logs []types.Log, MyQuery models.QueryModel) models.NodeGraph {
 
 	colors := []string{"orange", "green", "cyan", "rose"}
 
-	var processLogs []models.Log
+	var processLogs []types.Log
 
 	for _, log := range logs {
 
@@ -455,6 +372,8 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 
 	var processEdges []models.EdgeFields
 
+	nodeMap := make(map[string]interface{})
+
 	for _, log := range processLogs {
 		isBlocked := log.Result == denied
 
@@ -464,7 +383,7 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 				ID:                  log.ContainerName + log.NamespaceName,
 				Title:               log.ContainerName,
 				Color:               colors[colorIndex],
-				ChildNode:           fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+				ChildNode:           fmt.Sprintf("%d%s", log.HostPID, log.PodName),
 				DetailContainerName: log.ContainerName,
 				DetailNamespaceName: log.NamespaceName,
 			}
@@ -479,6 +398,7 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 				Mainstat: fmt.Sprintf("%s", "ContainerEdge"),
 				Count:    "None",
 			}
+			nodeMap[cnode.ID] = ""
 
 			processEdges = append(processEdges, edge)
 
@@ -486,21 +406,23 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 
 			edge := models.EdgeFields{
 				ID:       fmt.Sprintf("%s%d%d", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostPID),
-				Source:   fmt.Sprintf("%d%s%s", log.HostPPID, log.ContainerName, log.NamespaceName),
-				Target:   fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+				Source:   fmt.Sprintf("%d%s", log.HostPPID, log.PodName),
+				Target:   fmt.Sprintf("%d%s", log.HostPID, log.PodName),
 				Mainstat: fmt.Sprintf("%s", log.Data),
 
 				Count: "None",
 			}
 			processEdges = append(processEdges, edge)
 		}
-
+		nodeId := fmt.Sprintf("%d%s", log.HostPID, log.PodName)
+		nodeMap[nodeId] = ""
 		node := models.NodeFields{
-			ID:       fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+			ID:       nodeId,
 			Title:    log.ProcessName,
 			MainStat: log.Source,
 			Color:    "white",
 			// DetailTimestamp:         log.Timestamp,
+			// NodeRadius:              "5",
 			DetailClusterName:       log.ClusterName,
 			DetailHostName:          log.HostName,
 			DetailNamespaceName:     log.NamespaceName,
@@ -534,290 +456,308 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 
 	}
 
+	NewprocessEdges := []models.EdgeFields{}
+
+	for _, edge := range processEdges {
+		if _, ok := nodeMap[edge.Source]; ok {
+			if _, ok := nodeMap[edge.Target]; ok {
+				NewprocessEdges = append(NewprocessEdges, edge)
+			}
+		}
+	}
+
 	var nodeGraph = models.NodeGraph{
 		Nodes: ProcessNodes,
-		Edges: processEdges,
+		Edges: NewprocessEdges,
 	}
 
 	return nodeGraph
 }
 
-func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel, datasource *Datasource) models.NodeGraph {
-
-	var networkGraphs = []models.NetworkGraph{}
-	var networkData = models.NetworkData{}
-	var networkLogs []models.Log
-	var NodeData = []models.NodeFields{}
-	var EdgeData = []models.EdgeFields{}
-	var EdgeAcceptMap = make(map[string]int)
-	var EdgeConnectMap = make(map[string]int)
-	var EdgeMap = make(map[string]int)
-
-	for _, log := range logs {
-		if log.Operation == MyQuery.Operation {
-			networkLogs = append(networkLogs, log)
-		}
-	}
-	for _, log := range networkLogs {
-
-		datamap := extractdata(log.Data)
-		containsHostname := strings.Contains(log.Resource, "hostname")
-		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && containsHostname {
-			/* Extracting from data field */
-			kprobeData := datamap["kprobe"]
-			domainData := datamap["domain"]
-			peertype := datamap["ownertype"]
-
-			// if peertype == "pod" || peertype == "service" {
-
-			/* Extracting from Resource field */
-
-			resourceMap := extractdata(log.Resource)
-			remoteIP := resourceMap["remoteip"]
-			peerhostName := resourceMap["hostname"]
-			peerNamespace := resourceMap["namespace"]
-			podServiceName := resourceMap["podname"]
-			if peertype == "service" {
-				peerhostName += " SVC"
-				podServiceName = resourceMap["servicename"]
-				podServiceName += " SVC"
-
-			}
-			// if podServiceName == "" {
-			// 	podServiceName = log.PodName
-			// }
-			port := resourceMap["port"]
-			protocol := resourceMap["protocol"]
-
-			networkData = models.NetworkData{
-				NetworkType: "kprobe:" + kprobeData,
-				SockType:    "",
-				Kprobe:      kprobeData,
-				Domain:      domainData,
-				RemoteIP:    remoteIP,
-				HostName:    peerhostName,
-				Port:        port,
-				Protocol:    protocol,
-			}
-
-			ownerName := log.PodName
-			ownerNamespace := log.NamespaceName
-
-			if log.Owner.Name != "" {
-				ownerName = log.Owner.Name
-			}
-
-			if log.Owner.Namespace != "" {
-				ownerNamespace = log.Owner.Namespace
-			}
-
-			// if ownerName == "" {
-			//
-			// 	ownerName = log.Source
-			// }
-			// if ownerNamespace == "" {
-			// 	ownerNamespace = log.NamespaceName
-			// }
-
-			node := models.NodeFields{
-
-				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
-				Title:               ownerName,
-				MainStat:            log.PodName,
-				Color:               "white",
-				DetailPodName:       log.PodName,
-				DetailNamespaceName: ownerNamespace,
-			}
-
-			if log.Result == denied {
-				node.Color = "red"
-			}
-
-			switch kprobeData {
-			case "tcp_accept":
-				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, podServiceName, port, peerNamespace, protocol)
-				var NetworkGraph = models.NetworkGraph{
-					NData: networkData,
-					ID:    ID,
-					Source: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s", podServiceName, peerNamespace),
-						Title:    fmt.Sprintf("%s", peerhostName),
-						MainStat: fmt.Sprintf("%s", podServiceName),
-
-						DetailPodName:       podServiceName,
-						DetailNamespaceName: peerNamespace,
-
-						Color: "white",
-					},
-					Target: node,
-				}
-				networkGraphs = append(networkGraphs, NetworkGraph)
-				EdgeAcceptMap[ID] += 1
-
-				break
-			case "tcp_connect":
-
-				ID1 := fmt.Sprintf("%s%s%s%s%s", podServiceName, log.PodName, port, peerNamespace, protocol)
-				var NetworkGraph = models.NetworkGraph{
-
-					NData:  networkData,
-					ID:     ID1,
-					Source: node,
-					Target: models.NodeFields{
-						ID:                  fmt.Sprintf("%s%s", podServiceName, peerNamespace),
-						Title:               fmt.Sprintf("%s", peerhostName),
-						MainStat:            fmt.Sprintf("%s", podServiceName),
-						DetailPodName:       podServiceName,
-						DetailNamespaceName: peerNamespace,
-						Color:               "white",
-					},
-				}
-				networkGraphs = append(networkGraphs, NetworkGraph)
-
-				EdgeConnectMap[ID1] += 1
-				break
-			}
-
-			// }
-
-		} else if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && !containsHostname {
-
-			kprobeData := datamap["kprobe"]
-			domainData := datamap["domain"]
-
-			resourceMap := extractdata(log.Resource)
-			remoteIP := resourceMap["remoteip"]
-
-			port := resourceMap["port"]
-			protocol := resourceMap["protocol"]
-
-			networkData = models.NetworkData{
-				NetworkType: "kprobe:" + kprobeData,
-				SockType:    "",
-				Kprobe:      kprobeData,
-				Domain:      domainData,
-				RemoteIP:    remoteIP,
-				HostName:    "External",
-				Port:        port,
-				Protocol:    protocol,
-			}
-
-			node := models.NodeFields{
-
-				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
-				Title:               log.PodName,
-				MainStat:            log.PodName,
-				Color:               "white",
-				DetailPodName:       log.PodName,
-				DetailNamespaceName: log.NamespaceName,
-			}
-
-			if log.Result == denied {
-				node.Color = "red"
-			}
-
-			switch kprobeData {
-			case "tcp_accept":
-				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
-				var NetworkGraph = models.NetworkGraph{
-					NData: networkData,
-					ID:    ID,
-					Source: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
-						Title:    fmt.Sprintf("%s", remoteIP),
-						MainStat: fmt.Sprintf("%s", "External "),
-
-						DetailPodName:       "External",
-						DetailNamespaceName: "external",
-
-						Color: "white",
-					},
-					Target: node,
-				}
-				networkGraphs = append(networkGraphs, NetworkGraph)
-				EdgeAcceptMap[ID] += 1
-
-				break
-			case "tcp_connect":
-
-				ID1 := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
-				var NetworkGraph = models.NetworkGraph{
-
-					NData:  networkData,
-					ID:     ID1,
-					Source: node,
-					Target: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
-						Title:    fmt.Sprintf("%s", remoteIP),
-						MainStat: fmt.Sprintf("%s", "External "),
-
-						DetailPodName:       "External",
-						DetailNamespaceName: "external",
-
-						Color: "white",
-					},
-				}
-				networkGraphs = append(networkGraphs, NetworkGraph)
-
-				EdgeConnectMap[ID1] += 1
-				break
-			}
-
-		}
-
-	}
-
-	for key, value := range EdgeAcceptMap {
-		EdgeMap[key] = value
-	}
-
-	// Merge EdgeConnectMap into EdgeMap
-	for key, value := range EdgeConnectMap {
-		if _, exists := EdgeMap[key]; exists {
-			if EdgeMap[key] < EdgeConnectMap[key] {
-				EdgeMap[key] = value
-			}
-		} else {
-			EdgeMap[key] = value
-		}
-	}
-
-	for _, netGraph := range networkGraphs {
-		NodeData = append(NodeData, netGraph.Source)
-		NodeData = append(NodeData, netGraph.Target)
-
-		var edge = models.EdgeFields{
-			ID:       netGraph.ID,
-			Source:   netGraph.Source.ID,
-			Target:   netGraph.Target.ID,
-			Mainstat: netGraph.NData.Protocol + " " + netGraph.NData.Port,
-			Count:    strconv.Itoa(EdgeMap[netGraph.ID]),
-		}
-		EdgeData = append(EdgeData, edge)
-
-	}
-
-	var nodeGraph = models.NodeGraph{
-		Nodes: NodeData,
-		Edges: EdgeData,
-	}
-
-	return nodeGraph
+func getNGraph(logs []types.Log) models.NodeGraph {
+	return models.NodeGraph{}
 }
+
+// func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel, datasource *Datasource) models.NodeGraph {
+//
+// 	var networkGraphs = []models.NetworkGraph{}
+// 	var networkData = models.NetworkData{}
+// 	var networkLogs []models.Log
+// 	var NodeData = []models.NodeFields{}
+// 	var EdgeData = []models.EdgeFields{}
+// 	var EdgeAcceptMap = make(map[string]int)
+// 	var EdgeConnectMap = make(map[string]int)
+// 	var EdgeMap = make(map[string]int)
+//
+// 	for _, log := range logs {
+// 		if log.Operation == MyQuery.Operation {
+// 			networkLogs = append(networkLogs, log)
+// 		}
+// 	}
+// 	for _, log := range networkLogs {
+//
+// 		datamap := extractdata(log.Data)
+// 		containsHostname := strings.Contains(log.Resource, "hostname")
+// 		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && containsHostname {
+// 			/* Extracting from data field */
+// 			kprobeData := datamap["kprobe"]
+// 			domainData := datamap["domain"]
+// 			peertype := datamap["ownertype"]
+//
+// 			// if peertype == "pod" || peertype == "service" {
+//
+// 			/* Extracting from Resource field */
+//
+// 			resourceMap := extractdata(log.Resource)
+// 			remoteIP := resourceMap["remoteip"]
+// 			peerhostName := resourceMap["hostname"]
+// 			peerNamespace := resourceMap["namespace"]
+// 			podServiceName := resourceMap["podname"]
+// 			if peertype == "service" {
+// 				peerhostName += " SVC"
+// 				podServiceName = resourceMap["servicename"]
+// 				podServiceName += " SVC"
+//
+// 			}
+// 			// if podServiceName == "" {
+// 			// 	podServiceName = log.PodName
+// 			// }
+// 			port := resourceMap["port"]
+// 			protocol := resourceMap["protocol"]
+//
+// 			networkData = models.NetworkData{
+// 				NetworkType: "kprobe:" + kprobeData,
+// 				SockType:    "",
+// 				Kprobe:      kprobeData,
+// 				Domain:      domainData,
+// 				RemoteIP:    remoteIP,
+// 				HostName:    peerhostName,
+// 				Port:        port,
+// 				Protocol:    protocol,
+// 			}
+//
+// 			ownerName := log.PodName
+// 			ownerNamespace := log.NamespaceName
+//
+// 			if log.Owner.Name != "" {
+// 				ownerName = log.Owner.Name
+// 			}
+//
+// 			if log.Owner.Namespace != "" {
+// 				ownerNamespace = log.Owner.Namespace
+// 			}
+//
+// 			// if ownerName == "" {
+// 			//
+// 			// 	ownerName = log.Source
+// 			// }
+// 			// if ownerNamespace == "" {
+// 			// 	ownerNamespace = log.NamespaceName
+// 			// }
+//
+// 			node := models.NodeFields{
+//
+// 				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
+// 				Title:               ownerName,
+// 				MainStat:            log.PodName,
+// 				Color:               "white",
+// 				DetailPodName:       log.PodName,
+// 				DetailNamespaceName: ownerNamespace,
+// 			}
+//
+// 			if log.Result == denied {
+// 				node.Color = "red"
+// 			}
+//
+// 			switch kprobeData {
+// 			case "tcp_accept":
+// 				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, podServiceName, port, peerNamespace, protocol)
+// 				var NetworkGraph = models.NetworkGraph{
+// 					NData: networkData,
+// 					ID:    ID,
+// 					Source: models.NodeFields{
+// 						ID:       fmt.Sprintf("%s%s", podServiceName, peerNamespace),
+// 						Title:    fmt.Sprintf("%s", peerhostName),
+// 						MainStat: fmt.Sprintf("%s", podServiceName),
+//
+// 						DetailPodName:       podServiceName,
+// 						DetailNamespaceName: peerNamespace,
+//
+// 						Color: "white",
+// 					},
+// 					Target: node,
+// 				}
+// 				networkGraphs = append(networkGraphs, NetworkGraph)
+// 				EdgeAcceptMap[ID] += 1
+//
+// 				break
+// 			case "tcp_connect":
+//
+// 				ID1 := fmt.Sprintf("%s%s%s%s%s", podServiceName, log.PodName, port, peerNamespace, protocol)
+// 				var NetworkGraph = models.NetworkGraph{
+//
+// 					NData:  networkData,
+// 					ID:     ID1,
+// 					Source: node,
+// 					Target: models.NodeFields{
+// 						ID:                  fmt.Sprintf("%s%s", podServiceName, peerNamespace),
+// 						Title:               fmt.Sprintf("%s", peerhostName),
+// 						MainStat:            fmt.Sprintf("%s", podServiceName),
+// 						DetailPodName:       podServiceName,
+// 						DetailNamespaceName: peerNamespace,
+// 						Color:               "white",
+// 					},
+// 				}
+// 				networkGraphs = append(networkGraphs, NetworkGraph)
+//
+// 				EdgeConnectMap[ID1] += 1
+// 				break
+// 			}
+//
+// 			// }
+//
+// 		} else if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && !containsHostname {
+//
+// 			kprobeData := datamap["kprobe"]
+// 			domainData := datamap["domain"]
+//
+// 			resourceMap := extractdata(log.Resource)
+// 			remoteIP := resourceMap["remoteip"]
+//
+// 			port := resourceMap["port"]
+// 			protocol := resourceMap["protocol"]
+//
+// 			networkData = models.NetworkData{
+// 				NetworkType: "kprobe:" + kprobeData,
+// 				SockType:    "",
+// 				Kprobe:      kprobeData,
+// 				Domain:      domainData,
+// 				RemoteIP:    remoteIP,
+// 				HostName:    "External",
+// 				Port:        port,
+// 				Protocol:    protocol,
+// 			}
+//
+// 			node := models.NodeFields{
+//
+// 				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
+// 				Title:               log.PodName,
+// 				MainStat:            log.PodName,
+// 				Color:               "white",
+// 				DetailPodName:       log.PodName,
+// 				DetailNamespaceName: log.NamespaceName,
+// 			}
+//
+// 			if log.Result == denied {
+// 				node.Color = "red"
+// 			}
+//
+// 			switch kprobeData {
+// 			case "tcp_accept":
+// 				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
+// 				var NetworkGraph = models.NetworkGraph{
+// 					NData: networkData,
+// 					ID:    ID,
+// 					Source: models.NodeFields{
+// 						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
+// 						Title:    fmt.Sprintf("%s", remoteIP),
+// 						MainStat: fmt.Sprintf("%s", "External "),
+//
+// 						DetailPodName:       "External",
+// 						DetailNamespaceName: "external",
+//
+// 						Color: "white",
+// 					},
+// 					Target: node,
+// 				}
+// 				networkGraphs = append(networkGraphs, NetworkGraph)
+// 				EdgeAcceptMap[ID] += 1
+//
+// 				break
+// 			case "tcp_connect":
+//
+// 				ID1 := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
+// 				var NetworkGraph = models.NetworkGraph{
+//
+// 					NData:  networkData,
+// 					ID:     ID1,
+// 					Source: node,
+// 					Target: models.NodeFields{
+// 						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
+// 						Title:    fmt.Sprintf("%s", remoteIP),
+// 						MainStat: fmt.Sprintf("%s", "External "),
+//
+// 						DetailPodName:       "External",
+// 						DetailNamespaceName: "external",
+//
+// 						Color: "white",
+// 					},
+// 				}
+// 				networkGraphs = append(networkGraphs, NetworkGraph)
+//
+// 				EdgeConnectMap[ID1] += 1
+// 				break
+// 			}
+//
+// 		}
+//
+// 	}
+//
+// 	for key, value := range EdgeAcceptMap {
+// 		EdgeMap[key] = value
+// 	}
+//
+// 	// Merge EdgeConnectMap into EdgeMap
+// 	for key, value := range EdgeConnectMap {
+// 		if _, exists := EdgeMap[key]; exists {
+// 			if EdgeMap[key] < EdgeConnectMap[key] {
+// 				EdgeMap[key] = value
+// 			}
+// 		} else {
+// 			EdgeMap[key] = value
+// 		}
+// 	}
+//
+// 	for _, netGraph := range networkGraphs {
+// 		NodeData = append(NodeData, netGraph.Source)
+// 		NodeData = append(NodeData, netGraph.Target)
+//
+// 		var edge = models.EdgeFields{
+// 			ID:       netGraph.ID,
+// 			Source:   netGraph.Source.ID,
+// 			Target:   netGraph.Target.ID,
+// 			Mainstat: netGraph.NData.Protocol + " " + netGraph.NData.Port,
+// 			Count:    strconv.Itoa(EdgeMap[netGraph.ID]),
+// 		}
+// 		EdgeData = append(EdgeData, edge)
+//
+// 	}
+//
+// 	var nodeGraph = models.NodeGraph{
+// 		Nodes: NodeData,
+// 		Edges: EdgeData,
+// 	}
+//
+// 	return nodeGraph
+// }
 
 func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
 	res := &backend.CheckHealthResult{}
-	config, err := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
+	config, _ := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 
 	healthendpoint := d.settings.URL
 	switch config.Backend {
 	case "ELASTICSEARCH":
 		healthendpoint += "/_cluster/health"
-		break
 	case "LOKI":
 		healthendpoint += "/ready"
-		break
+	case "OPENSEARCH":
+		// healthendpoint += "/_cluster/health"
+		return &backend.CheckHealthResult{
+			Status:  backend.HealthStatusOk,
+			Message: fmt.Sprintf("Data source is working "),
+		}, nil
 	}
 
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, healthendpoint, nil)
