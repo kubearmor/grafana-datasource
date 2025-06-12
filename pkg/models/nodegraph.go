@@ -49,33 +49,6 @@ type NodeFields struct {
 	DetailOwnerName string
 }
 
-// type KubeArmorLogs struct {
-// 	DetailTimestamp         int    `json:"detail__Timestamp,omitempty"`
-// 	DetailClusterName       string `json:"detail__ClusterName,omitempty"`
-// 	DetailHostName          string `json:"detail__HostName,omitempty"`
-// 	DetailNamespaceName     string `json:"detail__NamespaceName,omitempty"`
-// 	DetailPodName           string `json:"detail__PodName,omitempty"`
-// 	DetailLabels            string `json:"detail__Labels,omitempty"`
-// 	DetailContainerID       string `json:"detail__ContainerID,omitempty"`
-// 	DetailContainerName     string `json:"detail__ContainerName,omitempty"`
-// 	DetailContainerImage    string `json:"detail__ContainerImage,omitempty"`
-// 	DetailParentProcessName string `json:"detail__ParentProcessName,omitempty"`
-// 	DetailProcessName       string `json:"detail__ProcessName,omitempty"`
-// 	DetailHostPPID          int    `json:"detail__HostPPID,omitempty"`
-// 	DetailHostPID           int    `json:"detail__HostPID,omitempty"`
-// 	DetailPPID              int    `json:"detail__PPID,omitempty"`
-// 	DetailPID               int    `json:"detail__PID,omitempty"`
-// 	DetailUID               int    `json:"detail__UID,omitempty"`
-// 	DetailType              string `json:"detail__Type,omitempty"`
-// 	DetailSource            string `json:"detail__Source,omitempty"`
-// 	DetailOperation         string `json:"detail__Operation,omitempty"`
-// 	DetailResource          string `json:"detail__Resource,omitempty"`
-// 	DetailData              string `json:"detail__Data,omitempty"`
-// 	DetailResult            string `json:"detail__Result,omitempty"`
-// 	DetailCwd               string `json:"detail__Cwd,omitempty"`
-// 	DetailTTY               string `json:"detail__TTY,omitempty"`
-// }
-
 type EdgeFields struct {
 	ID     string `json:"id"`
 	Source string `json:"source"`

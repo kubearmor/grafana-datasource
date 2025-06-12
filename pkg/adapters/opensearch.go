@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/accuknox/kubearmor/pkg/models"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 	opensearch "github.com/opensearch-project/opensearch-go"
@@ -23,37 +24,32 @@ type OpenSearchClient struct {
 
 func NewOpenSearchClient(dsc models.DataStoreConfig, allowInsecureTLS bool) (*OpenSearchClient, error) {
 
-	osCaCertPath := os.Getenv("OS_CA_CERT_PATH")
+	osAddress := dsc.URL
 
-	osAddress := os.Getenv("OS_URL")
 	if osAddress == "" {
-		osAddress = dsc.URL
+		osAddress = os.Getenv("OS_URL")
 	}
-	username := os.Getenv("OS_USERNAME")
-	password := os.Getenv("OS_PASSWORD")
+	// username := os.Getenv("OS_USERNAME")
+	// password := os.Getenv("OS_PASSWORD")
 	index := os.Getenv("OS_INDEX")
 	if index == "" {
-		index = "*"
+		index = "test_alert"
 	}
 
 	cfg := opensearch.Config{
-		Addresses: []string{osAddress},
-		Username:  username,
-		Password:  password,
+		Addresses: []string{dsc.URL},
+		Username:  dsc.Username,
+		Password:  dsc.Password,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: allowInsecureTLS,
+				InsecureSkipVerify: true,
 			},
 		},
 	}
 
-	if osCaCertPath != "" {
-		caCertBytes, err := os.ReadFile(osCaCertPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CA cert: %w", err)
-		}
-		cfg.CACert = caCertBytes
-	}
+	// if dsc.CACert != nil {
+	// 	cfg.CACert = dsc.CACert
+	// }
 
 	client, err := opensearch.NewClient(cfg)
 	if err != nil {
@@ -117,4 +113,36 @@ func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel, 
 	}
 
 	return logs
+}
+
+func (osc *OpenSearchClient) HealthCheck(ctx context.Context) (*backend.CheckHealthResult, error) {
+
+	res := &backend.CheckHealthResult{}
+	healthReq := opensearchapi.ClusterHealthRequest{}
+	healthRes, err := healthReq.Do(context.Background(), osc.client)
+
+	status := healthRes.StatusCode
+
+	ctxLogger := log.DefaultLogger.FromContext(ctx)
+	ctxLogger.Info("Healthcheck status", status)
+
+	if err != nil {
+		ctxLogger.Error("Healthcheck error in opensearch")
+		res.Status = backend.HealthStatusError
+		res.Message = fmt.Sprintf("HealthCheck failed in opensearch %v", err)
+		return res, err
+	}
+	defer healthRes.Body.Close()
+
+	if status != http.StatusOK {
+
+		res.Status = backend.HealthStatusError
+		res.Message = fmt.Sprintf("error on checking health check status from backend  %d", status)
+
+		return res, nil
+	}
+	return &backend.CheckHealthResult{
+		Status:  backend.HealthStatusOk,
+		Message: "Opensearch Health check sucess",
+	}, nil
 }

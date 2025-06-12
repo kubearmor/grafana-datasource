@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	// "strings"
 
 	"net/http"
-	// "strconv"
 
 	"github.com/accuknox/kubearmor/pkg/adapters"
 	"github.com/accuknox/kubearmor/pkg/models"
@@ -24,7 +22,6 @@ var (
 	_ backend.CheckHealthHandler    = (*Datasource)(nil)
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
-var Backend string = ""
 
 const (
 	pts0   = "pts0"
@@ -33,6 +30,7 @@ const (
 
 type BackendService interface {
 	GetLogs(ctx context.Context, qm models.QueryModel, index string) []types.Log
+	HealthCheck(ctx context.Context) (*backend.CheckHealthResult, error)
 }
 
 // NewDatasource creates a new datasource instance.
@@ -47,36 +45,43 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	if err != nil {
 		return nil, fmt.Errorf("Error in plugin settings: %w", err)
 	}
-	// clientset := getK8sClient(ctxLogger)
 
-	Backend = PluginSettings.Backend
-	// mux := &sync.RWMutex{}
-	// clustercache := &ClusterCache{
-	// 	ipPodCache: make(map[string]PodServiceInfo),
-	// 	mu:         mux,
-	// }
+	Backend := PluginSettings.Backend
 
 	cl, err := httpclient.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("httpclient new: %w", err)
 	}
+	var datastoreConfig models.DataStoreConfig
 
-	// client := &Client{
-	// 	k8sClient:      clientset,
-	// 	ClusterIPCache: clustercache,
-	// }
+	if err := json.Unmarshal(settings.JSONData, &datastoreConfig); err != nil {
+		return nil, fmt.Errorf("error unmarshaling settings: %w", err)
+	}
 
-	// go startInformers(client, ctxLogger)
+	// Secure fields
+	if password, ok := settings.DecryptedSecureJSONData["basicAuthPassword"]; ok {
+		datastoreConfig.Password = password
+	}
+	datastoreConfig.Username = settings.BasicAuthUser
+	if caCertPem, ok := settings.DecryptedSecureJSONData["tlsCACert"]; ok {
+		datastoreConfig.CACert = []byte(caCertPem)
+	}
+
+	datastoreConfig.URL = settings.URL
+	backendSVC := getBackendService(ctx, Backend, datastoreConfig)
+
 	return &Datasource{
 		settings:   settings,
 		httpClient: cl,
+		BackendSvc: backendSVC,
 	}, nil
 }
 
 // Datasource is an example datasource which can respond to data queries, reports
 // its health and has streaming skills.
 type Datasource struct {
-	settings backend.DataSourceInstanceSettings
+	settings   backend.DataSourceInstanceSettings
+	BackendSvc BackendService
 
 	httpClient *http.Client
 }
@@ -87,6 +92,44 @@ type Datasource struct {
 func (d *Datasource) Dispose() {
 	// Clean up datasource instance resources.
 	d.httpClient.CloseIdleConnections()
+}
+
+type Settings struct {
+	// URL
+
+	URL string `json:"-"` // use DecryptedSecureJSONData["basicAuthPassword"]
+
+	// Basic Auth
+	BasicAuthUser     string `json:"basicAuthUser"` // available directly
+	BasicAuthPassword string `json:"-"`             // use DecryptedSecureJSONData["basicAuthPassword"]
+
+	// TLS settings
+	TLSAuth           bool `json:"tlsAuth"`           // TLS Client Auth
+	TLSAuthWithCACert bool `json:"tlsAuthWithCACert"` // With CA Cert
+	TLSSkipVerify     bool `json:"tlsSkipVerify"`     // Skip TLS Verify
+
+	// OAuth forwarding
+	ForwardOAuthIdentity bool `json:"forwardOauthIdentity"` // Forward OAuth Identity
+
+	// Credentials forwarding
+	WithCredentials bool `json:"withCredentials"` // With Credentials
+
+	// Any other raw field (e.g., custom headers, etc.)
+	// You can add more fields as needed
+}
+
+var DatasourceSettings Settings
+
+func setDatasourceSetting(ds *backend.DataSourceInstanceSettings) error {
+	if err := json.Unmarshal(ds.JSONData, &DatasourceSettings); err != nil {
+		return fmt.Errorf("error unmarshaling settings: %w", err)
+	}
+
+	// Secure fields
+	if password, ok := ds.DecryptedSecureJSONData["basicAuthPassword"]; ok {
+		DatasourceSettings.BasicAuthPassword = password
+	}
+	return nil
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -111,12 +154,6 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 	return response, nil
 }
 
-type queryModel struct {
-	NamespaceQuery string `json:"NamespaceQuery,omitempty"`
-	LabelQuery     string `json:"LabelQuery,omitempty"`
-	Operation      string `json:"Operation"`
-}
-
 func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backend.DataQuery) backend.DataResponse {
 	var response backend.DataResponse
 
@@ -133,7 +170,6 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 		ctxLogger.Info("Query json is sucessfully marshalled operation: ")
 	}
 
-	// Nodegraph, _, _ := getGraphData(ctx, d, qm)
 	Nodegraph := getNodeGraph(ctx, d, qm)
 
 	Nodefields := getNodeFields()
@@ -151,21 +187,11 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	EdgeFrame := data.NewFrame("Edges")
 	EdgeFrame.Fields = EdgeFields
 
-	// edgetest := models.EdgeFields{
-	// 	ID:     "id",
-	// 	Source: qm.NamespaceQuery,
-	// 	Target: qm.Operation,
-	// }
-	// EdgeFrame.AppendRow(tty, string(qm.NamespaceQuery), fmt.Sprintf("%d", tot))
-	// EdgeFrame.AppendRow(edgetest.ID, edgetest.Source, edgetest.Target)
-
 	var frameMeta = data.FrameMeta{
 		PreferredVisualization: data.VisTypeNodeGraph,
 	}
 	Nodeframe.SetMeta(&frameMeta)
 	EdgeFrame.SetMeta(&frameMeta)
-	// EdgeFrame := data.NewFrame("Edges")
-	// add the frames to the response.
 
 	for _, node := range Nodegraph.Nodes {
 		if qm.Operation == "Process" {
@@ -175,10 +201,6 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 				node.Title,
 				node.MainStat,
 				node.Color,
-				// node.ChildNode,
-				// node.NodeRadius,
-				// node.Highlighted,
-				// int64(node.DetailTimestamp),
 				node.DetailClusterName,
 				node.DetailHostName,
 				node.DetailNamespaceName,
@@ -212,32 +234,6 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 				node.Color,
 				node.DetailPodName,
 				node.DetailNamespaceName,
-				// node.ChildNode,
-				// node.NodeRadius,
-				// node.Highlighted,
-				// node.DetailTimestamp,
-				// node.DetailClusterName,
-				// node.DetailHostName,
-				// node.DetailNamespaceName,
-				// node.DetailPodName,
-				// node.DetailLabels,
-				// node.DetailContainerID,
-				// node.DetailContainerName,
-				// node.DetailContainerImage,
-				// node.DetailParentProcessName,
-				// node.DetailProcessName,
-				// int64(node.DetailHostPPID),
-				// int64(node.DetailHostPID),
-				// int64(node.DetailPPID),
-				// int64(node.DetailPID),
-				// int64(node.DetailUID),
-				// node.DetailType,
-				// node.DetailSource,
-				// node.DetailOperation,
-				// node.DetailResource,
-				// node.DetailData,
-				// node.DetailResult,
-				// node.DetailCwd,
 			)
 		}
 	}
@@ -331,13 +327,7 @@ func getBackendService(ctx context.Context, backendName string, dsc models.DataS
 }
 
 func getNodeGraph(ctx context.Context, datasource *Datasource, qm models.QueryModel) models.NodeGraph {
-	datastoreConfig := models.DataStoreConfig{
-		URL:      datasource.settings.URL,
-		Username: datasource.settings.User,
-		Password: "",
-	}
-	service := getBackendService(ctx, Backend, datastoreConfig)
-	// GetLogs gets the KubeArmor logs from the respective datastore
+	service := datasource.BackendSvc // GetLogs gets the KubeArmor logs from the respective datastore
 	logs := service.GetLogs(ctx, qm, "test_alert")
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
@@ -478,320 +468,8 @@ func getNGraph(logs []types.Log) models.NodeGraph {
 	return models.NodeGraph{}
 }
 
-// func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel, datasource *Datasource) models.NodeGraph {
-//
-// 	var networkGraphs = []models.NetworkGraph{}
-// 	var networkData = models.NetworkData{}
-// 	var networkLogs []models.Log
-// 	var NodeData = []models.NodeFields{}
-// 	var EdgeData = []models.EdgeFields{}
-// 	var EdgeAcceptMap = make(map[string]int)
-// 	var EdgeConnectMap = make(map[string]int)
-// 	var EdgeMap = make(map[string]int)
-//
-// 	for _, log := range logs {
-// 		if log.Operation == MyQuery.Operation {
-// 			networkLogs = append(networkLogs, log)
-// 		}
-// 	}
-// 	for _, log := range networkLogs {
-//
-// 		datamap := extractdata(log.Data)
-// 		containsHostname := strings.Contains(log.Resource, "hostname")
-// 		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && containsHostname {
-// 			/* Extracting from data field */
-// 			kprobeData := datamap["kprobe"]
-// 			domainData := datamap["domain"]
-// 			peertype := datamap["ownertype"]
-//
-// 			// if peertype == "pod" || peertype == "service" {
-//
-// 			/* Extracting from Resource field */
-//
-// 			resourceMap := extractdata(log.Resource)
-// 			remoteIP := resourceMap["remoteip"]
-// 			peerhostName := resourceMap["hostname"]
-// 			peerNamespace := resourceMap["namespace"]
-// 			podServiceName := resourceMap["podname"]
-// 			if peertype == "service" {
-// 				peerhostName += " SVC"
-// 				podServiceName = resourceMap["servicename"]
-// 				podServiceName += " SVC"
-//
-// 			}
-// 			// if podServiceName == "" {
-// 			// 	podServiceName = log.PodName
-// 			// }
-// 			port := resourceMap["port"]
-// 			protocol := resourceMap["protocol"]
-//
-// 			networkData = models.NetworkData{
-// 				NetworkType: "kprobe:" + kprobeData,
-// 				SockType:    "",
-// 				Kprobe:      kprobeData,
-// 				Domain:      domainData,
-// 				RemoteIP:    remoteIP,
-// 				HostName:    peerhostName,
-// 				Port:        port,
-// 				Protocol:    protocol,
-// 			}
-//
-// 			ownerName := log.PodName
-// 			ownerNamespace := log.NamespaceName
-//
-// 			if log.Owner.Name != "" {
-// 				ownerName = log.Owner.Name
-// 			}
-//
-// 			if log.Owner.Namespace != "" {
-// 				ownerNamespace = log.Owner.Namespace
-// 			}
-//
-// 			// if ownerName == "" {
-// 			//
-// 			// 	ownerName = log.Source
-// 			// }
-// 			// if ownerNamespace == "" {
-// 			// 	ownerNamespace = log.NamespaceName
-// 			// }
-//
-// 			node := models.NodeFields{
-//
-// 				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
-// 				Title:               ownerName,
-// 				MainStat:            log.PodName,
-// 				Color:               "white",
-// 				DetailPodName:       log.PodName,
-// 				DetailNamespaceName: ownerNamespace,
-// 			}
-//
-// 			if log.Result == denied {
-// 				node.Color = "red"
-// 			}
-//
-// 			switch kprobeData {
-// 			case "tcp_accept":
-// 				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, podServiceName, port, peerNamespace, protocol)
-// 				var NetworkGraph = models.NetworkGraph{
-// 					NData: networkData,
-// 					ID:    ID,
-// 					Source: models.NodeFields{
-// 						ID:       fmt.Sprintf("%s%s", podServiceName, peerNamespace),
-// 						Title:    fmt.Sprintf("%s", peerhostName),
-// 						MainStat: fmt.Sprintf("%s", podServiceName),
-//
-// 						DetailPodName:       podServiceName,
-// 						DetailNamespaceName: peerNamespace,
-//
-// 						Color: "white",
-// 					},
-// 					Target: node,
-// 				}
-// 				networkGraphs = append(networkGraphs, NetworkGraph)
-// 				EdgeAcceptMap[ID] += 1
-//
-// 				break
-// 			case "tcp_connect":
-//
-// 				ID1 := fmt.Sprintf("%s%s%s%s%s", podServiceName, log.PodName, port, peerNamespace, protocol)
-// 				var NetworkGraph = models.NetworkGraph{
-//
-// 					NData:  networkData,
-// 					ID:     ID1,
-// 					Source: node,
-// 					Target: models.NodeFields{
-// 						ID:                  fmt.Sprintf("%s%s", podServiceName, peerNamespace),
-// 						Title:               fmt.Sprintf("%s", peerhostName),
-// 						MainStat:            fmt.Sprintf("%s", podServiceName),
-// 						DetailPodName:       podServiceName,
-// 						DetailNamespaceName: peerNamespace,
-// 						Color:               "white",
-// 					},
-// 				}
-// 				networkGraphs = append(networkGraphs, NetworkGraph)
-//
-// 				EdgeConnectMap[ID1] += 1
-// 				break
-// 			}
-//
-// 			// }
-//
-// 		} else if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && !containsHostname {
-//
-// 			kprobeData := datamap["kprobe"]
-// 			domainData := datamap["domain"]
-//
-// 			resourceMap := extractdata(log.Resource)
-// 			remoteIP := resourceMap["remoteip"]
-//
-// 			port := resourceMap["port"]
-// 			protocol := resourceMap["protocol"]
-//
-// 			networkData = models.NetworkData{
-// 				NetworkType: "kprobe:" + kprobeData,
-// 				SockType:    "",
-// 				Kprobe:      kprobeData,
-// 				Domain:      domainData,
-// 				RemoteIP:    remoteIP,
-// 				HostName:    "External",
-// 				Port:        port,
-// 				Protocol:    protocol,
-// 			}
-//
-// 			node := models.NodeFields{
-//
-// 				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
-// 				Title:               log.PodName,
-// 				MainStat:            log.PodName,
-// 				Color:               "white",
-// 				DetailPodName:       log.PodName,
-// 				DetailNamespaceName: log.NamespaceName,
-// 			}
-//
-// 			if log.Result == denied {
-// 				node.Color = "red"
-// 			}
-//
-// 			switch kprobeData {
-// 			case "tcp_accept":
-// 				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
-// 				var NetworkGraph = models.NetworkGraph{
-// 					NData: networkData,
-// 					ID:    ID,
-// 					Source: models.NodeFields{
-// 						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
-// 						Title:    fmt.Sprintf("%s", remoteIP),
-// 						MainStat: fmt.Sprintf("%s", "External "),
-//
-// 						DetailPodName:       "External",
-// 						DetailNamespaceName: "external",
-//
-// 						Color: "white",
-// 					},
-// 					Target: node,
-// 				}
-// 				networkGraphs = append(networkGraphs, NetworkGraph)
-// 				EdgeAcceptMap[ID] += 1
-//
-// 				break
-// 			case "tcp_connect":
-//
-// 				ID1 := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
-// 				var NetworkGraph = models.NetworkGraph{
-//
-// 					NData:  networkData,
-// 					ID:     ID1,
-// 					Source: node,
-// 					Target: models.NodeFields{
-// 						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
-// 						Title:    fmt.Sprintf("%s", remoteIP),
-// 						MainStat: fmt.Sprintf("%s", "External "),
-//
-// 						DetailPodName:       "External",
-// 						DetailNamespaceName: "external",
-//
-// 						Color: "white",
-// 					},
-// 				}
-// 				networkGraphs = append(networkGraphs, NetworkGraph)
-//
-// 				EdgeConnectMap[ID1] += 1
-// 				break
-// 			}
-//
-// 		}
-//
-// 	}
-//
-// 	for key, value := range EdgeAcceptMap {
-// 		EdgeMap[key] = value
-// 	}
-//
-// 	// Merge EdgeConnectMap into EdgeMap
-// 	for key, value := range EdgeConnectMap {
-// 		if _, exists := EdgeMap[key]; exists {
-// 			if EdgeMap[key] < EdgeConnectMap[key] {
-// 				EdgeMap[key] = value
-// 			}
-// 		} else {
-// 			EdgeMap[key] = value
-// 		}
-// 	}
-//
-// 	for _, netGraph := range networkGraphs {
-// 		NodeData = append(NodeData, netGraph.Source)
-// 		NodeData = append(NodeData, netGraph.Target)
-//
-// 		var edge = models.EdgeFields{
-// 			ID:       netGraph.ID,
-// 			Source:   netGraph.Source.ID,
-// 			Target:   netGraph.Target.ID,
-// 			Mainstat: netGraph.NData.Protocol + " " + netGraph.NData.Port,
-// 			Count:    strconv.Itoa(EdgeMap[netGraph.ID]),
-// 		}
-// 		EdgeData = append(EdgeData, edge)
-//
-// 	}
-//
-// 	var nodeGraph = models.NodeGraph{
-// 		Nodes: NodeData,
-// 		Edges: EdgeData,
-// 	}
-//
-// 	return nodeGraph
-// }
-
 func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	res := &backend.CheckHealthResult{}
-	config, _ := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
-	ctxLogger := log.DefaultLogger.FromContext(ctx)
+	backendService := d.BackendSvc
+	return backendService.HealthCheck(ctx)
 
-	healthendpoint := d.settings.URL
-	switch config.Backend {
-	case "ELASTICSEARCH":
-		healthendpoint += "/_cluster/health"
-	case "LOKI":
-		healthendpoint += "/ready"
-	case "OPENSEARCH":
-		// healthendpoint += "/_cluster/health"
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusOk,
-			Message: fmt.Sprintf("Data source is working "),
-		}, nil
-	}
-
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, healthendpoint, nil)
-
-	resp, err := d.httpClient.Do(r)
-
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			ctxLogger.Error("check health: failed to close response body", "err", err.Error())
-		}
-	}()
-
-	if err != nil {
-		res.Status = backend.HealthStatusError
-		res.Message = "Unable to load settings"
-		ctxLogger.Error("load settings: failed to load settings")
-		return res, nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		res.Status = backend.HealthStatusError
-		res.Message = fmt.Sprintf("error on checking health check status from backend  %s", resp.Status)
-
-		return res, nil
-	}
-
-	if config.Secrets.ApiKey == "" {
-		res.Status = backend.HealthStatusError
-		res.Message = "API key is missing"
-		return res, nil
-	}
-
-	return &backend.CheckHealthResult{
-		Status:  backend.HealthStatusOk,
-		Message: fmt.Sprintf("Data source is working "),
-	}, nil
 }
