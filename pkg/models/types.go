@@ -8,6 +8,7 @@ type QueryModel struct {
 }
 
 type DataStoreConfig struct {
+	Index    string
 	Username string `json:"basicAuthUser"` // basicAuthUser
 	Password string `json:"-"`             // Basicsuth Password
 	URL      string `json:"-"`             // Datasource URL

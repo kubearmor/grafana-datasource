@@ -29,11 +29,10 @@ func NewOpenSearchClient(dsc models.DataStoreConfig, allowInsecureTLS bool) (*Op
 	if osAddress == "" {
 		osAddress = os.Getenv("OS_URL")
 	}
-	// username := os.Getenv("OS_USERNAME")
-	// password := os.Getenv("OS_PASSWORD")
-	index := os.Getenv("OS_INDEX")
+
+	index := dsc.Index
 	if index == "" {
-		index = "test_alert"
+		index = os.Getenv("OS_INDEX")
 	}
 
 	cfg := opensearch.Config{
@@ -42,14 +41,14 @@ func NewOpenSearchClient(dsc models.DataStoreConfig, allowInsecureTLS bool) (*Op
 		Password:  dsc.Password,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+				InsecureSkipVerify: dsc.TLSSkipVerify,
 			},
 		},
 	}
 
-	// if dsc.CACert != nil {
-	// 	cfg.CACert = dsc.CACert
-	// }
+	if len(dsc.CACert) >= 0 && dsc.TLSAuthWithCACert {
+		cfg.CACert = dsc.CACert
+	}
 
 	client, err := opensearch.NewClient(cfg)
 	if err != nil {
@@ -63,7 +62,7 @@ func NewOpenSearchClient(dsc models.DataStoreConfig, allowInsecureTLS bool) (*Op
 	return osc, nil
 }
 
-func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel, index string) []types.Log {
+func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel) []types.Log {
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 

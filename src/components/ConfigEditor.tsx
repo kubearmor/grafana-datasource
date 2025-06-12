@@ -1,6 +1,5 @@
-// import { ChangeEvent } from 'react';
 import { DataSourcePluginOptionsEditorProps, } from "@grafana/data";
-import { DataSourceHttpSettings, InlineField, Select, } from "@grafana/ui";
+import { DataSourceHttpSettings, InlineField, Select, Input } from "@grafana/ui";
 import React from "react";
 import { MyDataSourceOptions, } from "../types";
 
@@ -13,7 +12,7 @@ export const ConfigEditor: React.FC<Props> = ({ onOptionsChange, options }) => {
     { label: "Loki ", value: "LOKI" },
     { label: "Opensearch", value: "OPENSEARCH" },
   ];
-  //
+
   const onBackendOptionsChange = (backendName: string) => {
     const jsonData = {
       ...options.jsonData,
@@ -36,6 +35,20 @@ export const ConfigEditor: React.FC<Props> = ({ onOptionsChange, options }) => {
           value={options.jsonData.backendName}
           onChange={(v) => {
             onBackendOptionsChange(v.value!);
+          }}
+        />
+      </InlineField>
+
+      <InlineField label="Index Name" labelWidth={16}>
+        <Input
+          value={options.jsonData.index || ""}
+          placeholder="e.g. logs-*"
+          onChange={(e) => {
+            const jsonData = {
+              ...options.jsonData,
+              index: e.currentTarget.value,
+            };
+            onOptionsChange({ ...options, jsonData });
           }}
         />
       </InlineField>

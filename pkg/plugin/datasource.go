@@ -29,7 +29,7 @@ const (
 )
 
 type BackendService interface {
-	GetLogs(ctx context.Context, qm models.QueryModel, index string) []types.Log
+	GetLogs(ctx context.Context, qm models.QueryModel) []types.Log
 	HealthCheck(ctx context.Context) (*backend.CheckHealthResult, error)
 }
 
@@ -52,6 +52,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	if err != nil {
 		return nil, fmt.Errorf("httpclient new: %w", err)
 	}
+
 	var datastoreConfig models.DataStoreConfig
 
 	if err := json.Unmarshal(settings.JSONData, &datastoreConfig); err != nil {
@@ -68,6 +69,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	}
 
 	datastoreConfig.URL = settings.URL
+	datastoreConfig.Index = PluginSettings.Index
 	backendSVC := getBackendService(ctx, Backend, datastoreConfig)
 
 	return &Datasource{
@@ -92,44 +94,6 @@ type Datasource struct {
 func (d *Datasource) Dispose() {
 	// Clean up datasource instance resources.
 	d.httpClient.CloseIdleConnections()
-}
-
-type Settings struct {
-	// URL
-
-	URL string `json:"-"` // use DecryptedSecureJSONData["basicAuthPassword"]
-
-	// Basic Auth
-	BasicAuthUser     string `json:"basicAuthUser"` // available directly
-	BasicAuthPassword string `json:"-"`             // use DecryptedSecureJSONData["basicAuthPassword"]
-
-	// TLS settings
-	TLSAuth           bool `json:"tlsAuth"`           // TLS Client Auth
-	TLSAuthWithCACert bool `json:"tlsAuthWithCACert"` // With CA Cert
-	TLSSkipVerify     bool `json:"tlsSkipVerify"`     // Skip TLS Verify
-
-	// OAuth forwarding
-	ForwardOAuthIdentity bool `json:"forwardOauthIdentity"` // Forward OAuth Identity
-
-	// Credentials forwarding
-	WithCredentials bool `json:"withCredentials"` // With Credentials
-
-	// Any other raw field (e.g., custom headers, etc.)
-	// You can add more fields as needed
-}
-
-var DatasourceSettings Settings
-
-func setDatasourceSetting(ds *backend.DataSourceInstanceSettings) error {
-	if err := json.Unmarshal(ds.JSONData, &DatasourceSettings); err != nil {
-		return fmt.Errorf("error unmarshaling settings: %w", err)
-	}
-
-	// Secure fields
-	if password, ok := ds.DecryptedSecureJSONData["basicAuthPassword"]; ok {
-		DatasourceSettings.BasicAuthPassword = password
-	}
-	return nil
 }
 
 // QueryData handles multiple queries and returns multiple responses.
@@ -172,9 +136,9 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 
 	Nodegraph := getNodeGraph(ctx, d, qm)
 
-	Nodefields := getNodeFields()
-	EdgeFields := getEdgeFields()
-	NetworkFields := getNetworkNodeFields()
+	Nodefields := models.GetNodeFields()
+	EdgeFields := models.GetEdgeFields()
+	NetworkFields := models.GetNetworkNodeFields()
 
 	Nodeframe := data.NewFrame("Nodes")
 	if qm.Operation == "Process" {
@@ -248,66 +212,6 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	return response
 }
 
-func getNodeFields() []*data.Field {
-
-	fields := make([]*data.Field, len(models.NodeframeFields))
-	for i, field := range models.NodeframeFields {
-		f := data.NewFieldFromFieldType(field.Type, 0)
-		f.Name = field.Name
-		if field.DisplayName != "" {
-			f.Config = &data.FieldConfig{
-				DisplayName:       field.DisplayName,
-				DisplayNameFromDS: field.DisplayName,
-			}
-		}
-		fields[i] = f
-
-	}
-
-	return fields
-}
-
-func getNetworkNodeFields() []*data.Field {
-
-	fields := make([]*data.Field, len(models.NetworkNodeframeFields))
-	for i, field := range models.NetworkNodeframeFields {
-		f := data.NewFieldFromFieldType(field.Type, 0)
-		f.Name = field.Name
-		if field.DisplayName != "" {
-			f.Config = &data.FieldConfig{
-				DisplayName:       field.DisplayName,
-				DisplayNameFromDS: field.DisplayName,
-			}
-		}
-		fields[i] = f
-
-	}
-
-	return fields
-
-}
-
-func getEdgeFields() []*data.Field {
-
-	fields := make([]*data.Field, len(models.EdgeframeFields))
-	for i, field := range models.EdgeframeFields {
-		f := data.NewFieldFromFieldType(field.Type, 0)
-		f.Name = field.Name
-
-		if field.DisplayName != "" {
-			f.Config = &data.FieldConfig{
-				DisplayName:       field.DisplayName,
-				DisplayNameFromDS: field.DisplayName,
-			}
-		}
-
-		fields[i] = f
-
-	}
-
-	return fields
-}
-
 func getBackendService(ctx context.Context, backendName string, dsc models.DataStoreConfig) BackendService {
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
@@ -328,7 +232,7 @@ func getBackendService(ctx context.Context, backendName string, dsc models.DataS
 
 func getNodeGraph(ctx context.Context, datasource *Datasource, qm models.QueryModel) models.NodeGraph {
 	service := datasource.BackendSvc // GetLogs gets the KubeArmor logs from the respective datastore
-	logs := service.GetLogs(ctx, qm, "test_alert")
+	logs := service.GetLogs(ctx, qm)
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 	ctxLogger.Info(fmt.Sprintf("received logs with len: %d", len(logs)))

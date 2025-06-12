@@ -11,6 +11,7 @@ type PluginSettings struct {
 	Path    string                `json:"path"`
 	Secrets *SecretPluginSettings `json:"-"`
 	Backend string                `json:"backendName"`
+	Index   string                `json:"index"`
 }
 
 type SecretPluginSettings struct {
