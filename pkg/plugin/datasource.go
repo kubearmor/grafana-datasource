@@ -29,7 +29,7 @@ const (
 )
 
 type BackendService interface {
-	GetLogs(ctx context.Context, qm models.QueryModel) []types.Log
+	GetLogs(ctx context.Context, qm models.QueryModel) ([]types.Log, error)
 	HealthCheck(ctx context.Context) (*backend.CheckHealthResult, error)
 }
 
@@ -70,7 +70,10 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 
 	datastoreConfig.URL = settings.URL
 	datastoreConfig.Index = PluginSettings.Index
-	backendSVC := getBackendService(ctx, Backend, datastoreConfig)
+	backendSVC, err := getBackendService(ctx, Backend, datastoreConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Datasource{
 		settings:   settings,
@@ -134,7 +137,11 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 		ctxLogger.Info("Query json is sucessfully marshalled operation: ")
 	}
 
-	Nodegraph := getNodeGraph(ctx, d, qm)
+	Nodegraph, err := getNodeGraph(ctx, d, qm)
+	if err != nil {
+		response.Error = err
+		return response
+	}
 
 	Nodefields := models.GetNodeFields()
 	EdgeFields := models.GetEdgeFields()
@@ -212,36 +219,41 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	return response
 }
 
-func getBackendService(ctx context.Context, backendName string, dsc models.DataStoreConfig) BackendService {
+func getBackendService(ctx context.Context, backendName string, dsc models.DataStoreConfig) (BackendService, error) {
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 	switch backendName {
 
 	case "ELASTICSEARCH":
-		return nil
+		return nil, nil
+
 	case "OPENSEARCH":
-		client, err := adapters.NewOpenSearchClient(dsc, true)
+		client, err := adapters.NewOpenSearchClient(dsc)
 		if err != nil {
 			ctxLogger.Error("Cannot create opensearch client %v :", err)
+			return nil, err
 		}
-		return client
 
+		return client, nil
 	}
-	return nil
+	return nil, nil
 }
 
-func getNodeGraph(ctx context.Context, datasource *Datasource, qm models.QueryModel) models.NodeGraph {
+func getNodeGraph(ctx context.Context, datasource *Datasource, qm models.QueryModel) (models.NodeGraph, error) {
 	service := datasource.BackendSvc // GetLogs gets the KubeArmor logs from the respective datastore
-	logs := service.GetLogs(ctx, qm)
+	logs, err := service.GetLogs(ctx, qm)
+	if err != nil {
+		return models.NodeGraph{}, err
+	}
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 	ctxLogger.Info(fmt.Sprintf("received logs with len: %d", len(logs)))
 
 	if qm.Operation == "Process" {
-		return getProcessGraph(logs, qm)
+		return getProcessGraph(logs, qm), nil
 	}
 
-	return models.NodeGraph{}
+	return models.NodeGraph{}, nil
 }
 
 func getProcessGraph(logs []types.Log, MyQuery models.QueryModel) models.NodeGraph {
