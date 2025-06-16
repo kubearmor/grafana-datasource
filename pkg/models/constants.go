@@ -213,3 +213,63 @@ var NodeframeFields = []FrameFieldType{
 		DisplayName: "TTY",
 	},
 }
+
+func GetNodeFields() []*data.Field {
+
+	fields := make([]*data.Field, len(NodeframeFields))
+	for i, field := range NodeframeFields {
+		f := data.NewFieldFromFieldType(field.Type, 0)
+		f.Name = field.Name
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
+		fields[i] = f
+
+	}
+
+	return fields
+}
+
+func GetNetworkNodeFields() []*data.Field {
+
+	fields := make([]*data.Field, len(NetworkNodeframeFields))
+	for i, field := range NetworkNodeframeFields {
+		f := data.NewFieldFromFieldType(field.Type, 0)
+		f.Name = field.Name
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
+		fields[i] = f
+
+	}
+
+	return fields
+
+}
+
+func GetEdgeFields() []*data.Field {
+
+	fields := make([]*data.Field, len(EdgeframeFields))
+	for i, field := range EdgeframeFields {
+		f := data.NewFieldFromFieldType(field.Type, 0)
+		f.Name = field.Name
+
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
+
+		fields[i] = f
+
+	}
+
+	return fields
+}

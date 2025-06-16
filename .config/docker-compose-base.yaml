@@ -3,12 +3,11 @@ services:
     user: root
     container_name: 'accuknox-kubearmor-datasource'
 
-    platform: 'linux/amd64'
     build:
-      context: ./.config
+      context: .
       args:
         grafana_image: ${GRAFANA_IMAGE:-grafana-enterprise}
-        grafana_version: ${GRAFANA_VERSION:-10.3.3}
+        grafana_version: ${GRAFANA_VERSION:-11.5.3}
         development: ${DEVELOPMENT:-false}
         anonymous_auth_enabled: ${ANONYMOUS_AUTH_ENABLED:-true}
     ports:
@@ -20,9 +19,9 @@ services:
     cap_add:
       - SYS_PTRACE
     volumes:
-      - ./dist:/var/lib/grafana/plugins/accuknox-kubearmor-datasource:z
-      - ./provisioning:/etc/grafana/provisioning:z
-      - .:/root/accuknox-kubearmor-datasource:z
+      - ../dist:/var/lib/grafana/plugins/accuknox-kubearmor-datasource
+      - ../provisioning:/etc/grafana/provisioning
+      - ..:/root/accuknox-kubearmor-datasource
 
     environment:
       NODE_ENV: development
@@ -30,6 +29,3 @@ services:
       GF_LOG_LEVEL: debug
       GF_DATAPROXY_LOGGING: 1
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: accuknox-kubearmor-datasource
-      
-
-

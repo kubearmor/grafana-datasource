@@ -11,10 +11,12 @@ type PluginSettings struct {
 	Path    string                `json:"path"`
 	Secrets *SecretPluginSettings `json:"-"`
 	Backend string                `json:"backendName"`
+	Index   string                `json:"index"`
 }
 
 type SecretPluginSettings struct {
 	ApiKey string `json:"apiKey"`
+	// BasicAuthPassword string  `json:"password"`
 }
 
 func LoadPluginSettings(source backend.DataSourceInstanceSettings) (*PluginSettings, error) {

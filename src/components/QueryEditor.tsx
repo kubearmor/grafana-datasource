@@ -1,5 +1,5 @@
 import React from 'react';
-import { InlineField, Stack, Select } from '@grafana/ui';
+import { InlineField, Stack, Select, Input } from '@grafana/ui';
 import { QueryEditorProps, SelectableValue } from '@grafana/data';
 import { DataSource } from '../datasource';
 import { MyDataSourceOptions, MyQuery } from '../types';
@@ -14,7 +14,12 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
   // }
   // const [namespace, setNamespace] = useState<SelectableValue<string>[]>([Allselectable])
   // const [labels, setLabels] = useState<SelectableValue<string>[]>([Allselectable])
+const onBatchChange = (BatchSize: number) =>{
+    
+        onChange({ ...query, BatchSize: BatchSize});
+  }
 
+  
   const onQueryChange = (qname: string, type: string) => {
 
     switch (type) {
@@ -32,7 +37,7 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
     onRunQuery();
   }
 
-  const { NamespaceQuery, LabelQuery, Operation } = query;
+  const { NamespaceQuery, LabelQuery, Operation, BatchSize } = query;
   const frame = data?.series[0];
   const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName')
 
@@ -123,6 +128,16 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
           }} />
 
 
+      </InlineField>
+
+
+      <InlineField label="Batch Size" labelWidth={16} tooltip="Number of items to process in each batch">
+        <Input
+          type="number"
+          value={BatchSize || 1000}
+          onChange={e => onBatchChange(Number(e.currentTarget.value))}
+          min={1}
+        />
       </InlineField>
     </Stack>
   );
