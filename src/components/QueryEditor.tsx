@@ -14,12 +14,12 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
   // }
   // const [namespace, setNamespace] = useState<SelectableValue<string>[]>([Allselectable])
   // const [labels, setLabels] = useState<SelectableValue<string>[]>([Allselectable])
-const onBatchChange = (BatchSize: number) =>{
-    
-        onChange({ ...query, BatchSize: BatchSize});
+  const onBatchChange = (BatchSize: number) => {
+
+    onChange({ ...query, BatchSize: BatchSize });
   }
 
-  
+
   const onQueryChange = (qname: string, type: string) => {
 
     switch (type) {
@@ -33,11 +33,13 @@ const onBatchChange = (BatchSize: number) =>{
         break;
       case "OPERATION":
         onChange({ ...query, Operation: qname })
+      case "VISUALIZATION":
+        onChange({ ...query, Visualization: qname })
     }
     onRunQuery();
   }
 
-  const { NamespaceQuery, LabelQuery, Operation, BatchSize } = query;
+  const { NamespaceQuery, LabelQuery, Operation, BatchSize, Visualization } = query;
   const frame = data?.series[0];
   const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName')
 
@@ -92,6 +94,18 @@ const onBatchChange = (BatchSize: number) =>{
     }
   ]
 
+  const VisualizationOptions: SelectableValue[] = [
+    {
+      label: "ProcessGraph",
+      value: "PROCESSGRAPH",
+
+    },
+    {
+      label: "NetworkGraph",
+      value: "NETWORKGRAPH"
+    }
+  ]
+
   return (
     <Stack gap={0}>
       <InlineField label="namespace" labelWidth={16} tooltip="filter using Namespaces">
@@ -125,6 +139,18 @@ const onBatchChange = (BatchSize: number) =>{
           value={Operation || 'Process'}
           onChange={v => {
             onQueryChange(v.value!, "OPERATION")
+          }} />
+
+
+      </InlineField>
+
+      <InlineField label="Visualization" labelWidth={16} >
+
+        <Select
+          options={VisualizationOptions}
+          value={Visualization || 'PROCESSGRAPH'}
+          onChange={v => {
+            onQueryChange(v.value!, "VISUALIZATION")
           }} />
 
 

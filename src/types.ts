@@ -10,12 +10,14 @@ export interface QueryType {
   LabelQuery?: string;
   Operation: string;
   BatchSize?: number;
+  Visualization: string
 }
 
 export const DEFAULT_QUERY: Partial<MyQuery> = {
   NamespaceQuery: "All",
   LabelQuery: "All",
   Operation: "Process",
+  Visualization: "PROCESSGRAPH"
 };
 
 // export interface DataPoint {

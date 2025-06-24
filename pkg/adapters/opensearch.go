@@ -25,7 +25,7 @@ type OpenSearchClient struct {
 	index  string
 }
 
-func NewOpenSearchClient(dsc models.DataStoreConfig) (*OpenSearchClient, error) {
+func newOpenSearchClient(dsc models.DataStoreConfig) (*OpenSearchClient, error) {
 
 	osAddress := firstNonEmpty(dsc.URL, os.Getenv("OS_URL"))
 	if osAddress == "" {
@@ -93,23 +93,13 @@ func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel) 
 
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 
-	batchSize := 1000
-	if qm.BatchSize > 0 {
-		batchSize = qm.BatchSize
-	} else if qm.BatchSize < 0 {
+	if qm.BatchSize < 0 {
 		ctxLogger.Warn("Invalid batch size, using default", "requested", qm.BatchSize)
 	}
+	qm.BatchSize = 1000
 
 	// Prepare search query
-	query := fmt.Sprintf(`{
-  "query": {
-    "wildcard": {
-      "TTY.keyword": "pts*"
-    }
-  },
-  "size": %d
-}`, batchSize)
-
+	query := getQuery(qm)
 	indices := []string{osc.index}
 	searchReq := opensearchapi.SearchRequest{
 		Index: indices,
@@ -158,6 +148,35 @@ func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel) 
 	}
 	ctxLogger.Debug("Successfully fetched logs", "count", len(logs))
 	return logs, nil
+}
+
+func getQuery(qm models.QueryModel) string {
+	processGraphquery := fmt.Sprintf(`{
+  "query": {
+    "wildcard": {
+      "TTY.keyword": "pts*"
+    }
+  },
+  "size": %d
+}`, qm.BatchSize)
+
+	networkGraphQuery := fmt.Sprintf(`{
+  "query": {
+    "wildcard": {
+      "Data.keyword": "*tcp_*"
+    }
+  },
+  "size": %d
+}`, qm.BatchSize)
+
+	switch qm.Visualization {
+	case models.PROCESSGRAPH:
+		return processGraphquery
+	case models.NETWORKGRAPH:
+		return networkGraphQuery
+
+	}
+	return ""
 }
 
 func (osc *OpenSearchClient) HealthCheck(ctx context.Context) (*backend.CheckHealthResult, error) {
