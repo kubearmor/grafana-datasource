@@ -100,6 +100,7 @@ func (osc *OpenSearchClient) GetLogs(ctx context.Context, qm models.QueryModel) 
 
 	// Prepare search query
 	query := getQuery(qm)
+	ctxLogger.Info("myq: %s", query)
 	indices := []string{osc.index}
 	searchReq := opensearchapi.SearchRequest{
 		Index: indices,
@@ -178,6 +179,42 @@ func getQuery(qm models.QueryModel) string {
   "size": %d
 }`, qm.BatchSize)
 
+	op := qm.Operation
+
+	var profileQuery string
+	if op != "" {
+		// both clauses: wildcard + term filter
+		profileQuery = fmt.Sprintf(`{
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "wildcard": {
+            "Type.keyword": "*Log*"
+          }
+        },
+        {
+          "term": {
+            "Operation.keyword": "%s"
+          }
+        }
+      ]
+    }
+  },
+  "size": %d
+}`, op, qm.BatchSize)
+	} else {
+		// only wildcard clause
+		profileQuery = fmt.Sprintf(`{
+  "query": {
+    "wildcard": {
+      "Type.keyword": "*Log*"
+    }
+  },
+  "size": %d
+}`, qm.BatchSize)
+	}
+
 	switch qm.Visualization {
 	case models.PROCESSGRAPH:
 		return processGraphquery
@@ -185,8 +222,8 @@ func getQuery(qm models.QueryModel) string {
 		return networkGraphQuery
 	case models.ALERTCOUNTGRAPH:
 		return alertQuery
-	case models.ALERTLIST:
-		return alertQuery
+	case models.PROFILE:
+		return profileQuery
 
 	}
 	return ""

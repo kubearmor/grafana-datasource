@@ -32,8 +32,8 @@ func (v *Visualization) GetVisualization() backend.DataResponse {
 		return v.getNetworkGraph()
 	case models.ALERTCOUNTGRAPH:
 		return v.getAlertCountGraph()
-	case models.ALERTLIST:
-		return v.getAlertList()
+	case models.PROFILE:
+		return v.getProfileView()
 
 	}
 	return backend.DataResponse{}

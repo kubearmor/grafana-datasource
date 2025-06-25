@@ -83,7 +83,7 @@ func (v *Visualization) getProcessGraph() backend.DataResponse {
 	return response
 }
 
-func getProcessTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGraph {
+func getProcessTree(logs []types.Log, qm models.QueryModel) models.NodeGraph {
 
 	colors := []string{"orange", "green", "cyan", "rose"}
 
@@ -92,8 +92,8 @@ func getProcessTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 	for _, log := range logs {
 
 		if log.TTY == pts0 && log.Operation == "Process" &&
-			(MyQuery.NamespaceQuery == "All" || log.NamespaceName == MyQuery.NamespaceQuery) &&
-			(MyQuery.LabelQuery == "All" || log.Labels == MyQuery.LabelQuery) {
+			(qm.NamespaceQuery == "All" || log.NamespaceName == qm.NamespaceQuery) &&
+			(qm.LabelQuery == "All" || log.Labels == qm.LabelQuery) {
 			processLogs = append(processLogs, log)
 		}
 
@@ -116,7 +116,7 @@ func getProcessTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 				ID:                  log.ContainerName + log.NamespaceName,
 				Title:               log.ContainerName,
 				Color:               colors[colorIndex],
-				ChildNode:           fmt.Sprintf("%d%s", log.HostPID, log.PodName),
+				ChildNode:           fmt.Sprintf("%d%s%s", log.HostPID, log.PodName, log.HostName),
 				DetailContainerName: log.ContainerName,
 				DetailNamespaceName: log.NamespaceName,
 			}
@@ -138,21 +138,21 @@ func getProcessTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 		} else {
 
 			edge := models.EdgeFields{
-				ID:       fmt.Sprintf("%s%d%d", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostPID),
-				Source:   fmt.Sprintf("%d%s", log.HostPPID, log.PodName),
-				Target:   fmt.Sprintf("%d%s", log.HostPID, log.PodName),
+				ID:       fmt.Sprintf("%s%d%s", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostName),
+				Source:   fmt.Sprintf("%d%s%s", log.HostPPID, log.PodName, log.HostName),
+				Target:   fmt.Sprintf("%d%s%s", log.HostPID, log.PodName, log.HostName),
 				Mainstat: fmt.Sprintf("%s", log.Data),
 
 				Count: "None",
 			}
 			processEdges = append(processEdges, edge)
 		}
-		nodeId := fmt.Sprintf("%d%s", log.HostPID, log.PodName)
+		nodeId := fmt.Sprintf("%d%s%s", log.HostPID, log.PodName, log.HostName)
 		nodeMap[nodeId] = ""
 		node := models.NodeFields{
 			ID:       nodeId,
 			Title:    log.ProcessName,
-			MainStat: log.Source,
+			MainStat: log.ProcessName,
 			Color:    "white",
 			// DetailTimestamp:         log.Timestamp,
 			// NodeRadius:              "5",

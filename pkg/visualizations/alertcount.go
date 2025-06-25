@@ -1,8 +1,6 @@
 package visualizations
 
 import (
-	"context"
-
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 
@@ -16,11 +14,6 @@ type AlertCounts struct {
 	capability uint16
 	blocked    uint16
 	total      uint16
-}
-
-// Assume these functions return alert counts from your backend (Opensearch or logic)
-func fetchAlertCounts(ctx context.Context) (file, proc, net, cap int16, err error) {
-	return 12, 34, 7, 2, nil // stub values
 }
 
 func getAlertCount(alerts []types.Log) AlertCounts {

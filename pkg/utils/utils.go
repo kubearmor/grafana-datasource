@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/accuknox/kubearmor/pkg/models"
+	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 )
 
 func ConvertToInt(s string) int {
@@ -45,4 +48,20 @@ func Extractdata(body string) map[string]string {
 
 func ResolveIp(remoteIP string) string {
 	return ""
+}
+
+func IsCorrectLog(log types.Log, qm models.QueryModel) bool {
+	if log.Operation != qm.Operation {
+		return false
+	}
+
+	if log.NamespaceName != "All" && log.NamespaceName != qm.NamespaceQuery {
+		return false
+	}
+
+	if log.Labels != "All" && log.Labels != qm.LabelQuery {
+		return false
+	}
+
+	return true
 }

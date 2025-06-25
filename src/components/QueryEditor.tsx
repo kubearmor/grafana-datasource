@@ -21,29 +21,35 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
 
 
   const onQueryChange = (qname: string, type: string) => {
-
     switch (type) {
       case "NAMESPACE":
-
         onChange({ ...query, NamespaceQuery: qname });
         break;
-      case "LABEL":
 
+      case "LABEL":
         onChange({ ...query, LabelQuery: qname });
         break;
+
       case "OPERATION":
-        onChange({ ...query, Operation: qname })
+        onChange({ ...query, Operation: qname });
+        break;   // ← add this
+
       case "VISUALIZATION":
-        onChange({ ...query, Visualization: qname })
+        onChange({ ...query, Visualization: qname });
+        break;   // ← and this, too
+
+      default:
+        return;
     }
+
     onRunQuery();
-  }
+  };
 
   const { NamespaceQuery, LabelQuery, Operation, BatchSize, Visualization } = query;
   const frame = data?.series[0];
-  const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName')
+  const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName') || frame?.fields.find(i => i.name == "Namespace")
 
-  const Labels = frame?.fields.find(i => i.name === 'detail__Labels')
+  const Labels = frame?.fields.find(i => i.name === 'detail__Labels') || frame?.fields.find(i => i.name == "labels")
   const uniqueNamespaces = new Set<string>(["All"]);
   const uniqueLabels = new Set<string>(["All"])
 
@@ -91,7 +97,17 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
     {
       label: "Network",
       value: "Network"
-    }
+    },
+
+    {
+      label: "File",
+      value: "File"
+    },
+
+    {
+      label: "Syscall",
+      value: "Syscall"
+    },
   ]
 
   const VisualizationOptions: SelectableValue[] = [
@@ -111,9 +127,9 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
     },
 
     {
-      label: "AlertList",
-      value: "ALERTLIST"
-    }
+      label: "Profile View",
+      value: "PROFILE"
+    },
   ]
 
   return (
