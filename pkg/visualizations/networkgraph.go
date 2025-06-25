@@ -52,8 +52,8 @@ func (v *Visualization) getNetworkGraph() backend.DataResponse {
 			node.Title,
 			node.MainStat,
 			node.Color,
-			node.DetailNamespaceName,
 			node.DetailPodName,
+			node.DetailNamespaceName,
 		)
 	}
 
@@ -94,7 +94,7 @@ func getNetworkTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 		node1 := models.NodeFields{
 			ID:                  fmt.Sprintf("pod/%s/%s", log.NamespaceName, log.PodName),
 			Title:               fmt.Sprintf("pod/%s/%s", log.NamespaceName, log.PodName),
-			MainStat:            fmt.Sprintf("type:POD"),
+			MainStat:            log.PodName,
 			DetailPodName:       log.PodName,
 			DetailNamespaceName: log.NamespaceName,
 			Color:               "white",
