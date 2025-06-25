@@ -30,6 +30,10 @@ func (v *Visualization) GetVisualization() backend.DataResponse {
 		return v.getProcessGraph()
 	case models.NETWORKGRAPH:
 		return v.getNetworkGraph()
+	case models.ALERTCOUNTGRAPH:
+		return v.getAlertCountGraph()
+	case models.ALERTLIST:
+		return v.getAlertList()
 
 	}
 	return backend.DataResponse{}

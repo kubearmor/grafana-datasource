@@ -103,6 +103,16 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
     {
       label: "NetworkGraph",
       value: "NETWORKGRAPH"
+    },
+
+    {
+      label: "AlertCount",
+      value: "ALERTCOUNTGRAPH"
+    },
+
+    {
+      label: "AlertList",
+      value: "ALERTLIST"
     }
   ]
 

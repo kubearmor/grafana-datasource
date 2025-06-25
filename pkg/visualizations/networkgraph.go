@@ -11,6 +11,14 @@ import (
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
 )
 
+const (
+	HOST_UNKNOWN = "HOST_UNKNOWN"
+	ACCEPT       = "ACCEPT"
+	CONNECT      = "CONNECT"
+	POD          = "POD"
+	SERVICE      = "SERVICE"
+)
+
 func (v *Visualization) getNetworkGraph() backend.DataResponse {
 	var response backend.DataResponse
 
@@ -94,9 +102,9 @@ func getNetworkTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 		networkNodes = append(networkNodes, node1)
 
 		node2 := models.NodeFields{
-			ID:                  netinfo.remoteHost,
+			ID:                  netinfo.IP,
 			Title:               netinfo.remoteHost,
-			MainStat:            netinfo.remoteHost,
+			MainStat:            netinfo.IP,
 			DetailPodName:       netinfo.remoteHost,
 			DetailNamespaceName: netinfo.remoteHost,
 			Color:               "white",
@@ -117,7 +125,6 @@ func getNetworkTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 			node2.DetailNamespaceName = node2Namespace
 			node2.DetailPodName = node2name
 		}
-
 		edge := models.EdgeFields{
 			ID:       fmt.Sprintf("%s%s", netinfo.IP, netinfo.port),
 			Source:   node1.ID,
@@ -125,7 +132,7 @@ func getNetworkTree(logs []types.Log, MyQuery models.QueryModel) models.NodeGrap
 			Mainstat: fmt.Sprintf("ip:%s port:%s", netinfo.IP, netinfo.port),
 			Count:    "",
 		}
-		if netinfo.connectionType == "ACCEPT" {
+		if netinfo.connectionType == ACCEPT {
 			edge.Source = node2.ID
 			edge.Target = node1.ID
 		}
@@ -154,9 +161,9 @@ func extractNetworkInfo(log types.Log) (NetworkInfo, error) {
 
 	if strings.Contains(log.Data, "tcp_connect") {
 
-		netInfo.connectionType = "CONNECT"
+		netInfo.connectionType = CONNECT
 	} else if strings.Contains(log.Data, "tcp_accept") {
-		netInfo.connectionType = "ACCEPT"
+		netInfo.connectionType = ACCEPT
 	} else {
 		return NetworkInfo{}, fmt.Errorf("unknown log")
 	}
@@ -177,7 +184,7 @@ func extractNetworkInfo(log types.Log) (NetworkInfo, error) {
 				netInfo.remoteHost = parts[1]
 			}
 		} else {
-			netInfo.remoteHost = "HOST_UNKNOWN"
+			netInfo.remoteHost = HOST_UNKNOWN
 		}
 
 		// Extract Port

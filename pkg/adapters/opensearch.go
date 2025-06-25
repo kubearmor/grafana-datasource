@@ -169,11 +169,24 @@ func getQuery(qm models.QueryModel) string {
   "size": %d
 }`, qm.BatchSize)
 
+	alertQuery := fmt.Sprintf(`{
+  "query": {
+    "wildcard": {
+      "Type.keyword": "*Matche*"
+    }
+  },
+  "size": %d
+}`, qm.BatchSize)
+
 	switch qm.Visualization {
 	case models.PROCESSGRAPH:
 		return processGraphquery
 	case models.NETWORKGRAPH:
 		return networkGraphQuery
+	case models.ALERTCOUNTGRAPH:
+		return alertQuery
+	case models.ALERTLIST:
+		return alertQuery
 
 	}
 	return ""
