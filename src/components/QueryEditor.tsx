@@ -47,9 +47,9 @@ export function QueryEditor({ query, onChange, onRunQuery, data }: Props) {
 
   const { NamespaceQuery, LabelQuery, Operation, BatchSize, Visualization } = query;
   const frame = data?.series[0];
-  const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName') || frame?.fields.find(i => i.name == "Namespace")
+  const Namespaces = frame?.fields.find(i => i.name === 'detail__NamespaceName') || frame?.fields.find(i => i.name === "Namespace")
 
-  const Labels = frame?.fields.find(i => i.name === 'detail__Labels') || frame?.fields.find(i => i.name == "labels")
+  const Labels = frame?.fields.find(i => i.name === 'detail__Labels') || frame?.fields.find(i => i.name === "labels")
   const uniqueNamespaces = new Set<string>(["All"]);
   const uniqueLabels = new Set<string>(["All"])
 
