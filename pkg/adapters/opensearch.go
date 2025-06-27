@@ -44,7 +44,7 @@ func newOpenSearchClient(dsc models.DataStoreConfig) (*OpenSearchClient, error) 
 	}
 
 	// Handle CA certificate if provided
-	if dsc.TLSAuthWithCACert && len(dsc.CACert) > 0 {
+	if dsc.TLSAuthWithCACert && len(dsc.CACert) > 0 && !dsc.TLSSkipVerify {
 		caCertPool := x509.NewCertPool()
 		if !caCertPool.AppendCertsFromPEM(dsc.CACert) {
 			return nil, errors.New("failed to parse CA certificate")
