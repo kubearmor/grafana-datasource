@@ -1,10 +1,13 @@
 package models
 
+import ()
+
 type QueryModel struct {
 	NamespaceQuery string `json:"NamespaceQuery,omitempty"`
 	LabelQuery     string `json:"LabelQuery,omitempty"`
 	Operation      string `json:"Operation"`
 	BatchSize      int    `json:"BatchSize"`
+	Visualization  string `json:"Visualization"` // "gauge", "table", "logs", "nodegraph", etc.
 }
 
 type DataStoreConfig struct {

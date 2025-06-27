@@ -1,16 +1,8 @@
 package models
 
-import "github.com/grafana/grafana-plugin-sdk-go/data"
-
 type NodeGraph struct {
 	Nodes []NodeFields
 	Edges []EdgeFields
-}
-
-type FrameFieldType struct {
-	Name        string         `json:"name"`
-	Type        data.FieldType `json:"type"`
-	DisplayName string
 }
 
 type NodeFields struct {
