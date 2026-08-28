@@ -2,7 +2,7 @@
 2) Install and setup KubeArmor in the cluster by using this [guide](https://github.com/kubearmor/KubeArmor/blob/main/getting-started/deployment_guide.md) 
 3) Clone this repo and build it as mentioned in the README.md 
 4) go and edit the grafana.yaml in the grafana-es/deploy directory by specifying the correct plugin path for the 3 path for example 
-(path: /home/hari/opensource/grafana_Kubearmor/accuknox-kubearmorplugin-datasource/dist) change this path to correct path to the dist 
+(path: /home/hari/opensource/grafana_Kubearmor/kubearmorplugin-datasource/dist) change this path to correct path to the dist 
 for example `path/to/the/plugin/dist` similarly change others as well.
 5) Clone the [repo](https://github.com/harisudarsan1/kubearmor-dashboards) and run `kubectl apply -f grafana-es/deploy/`
 6) Now open grafana by `kubectl port-forward deploy/grafana -n kubearmor 3000:3000` and open localhost:3000.

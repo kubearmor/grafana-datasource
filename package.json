@@ -1,7 +1,7 @@
 {
   "name": "kubearmor",
   "version": "1.0.2",
-  "description": "A backend datasource for kube armor",
+  "description": "A backend datasource for KubeArmor",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
@@ -14,7 +14,7 @@
     "test:ci": "jest --passWithNoTests --maxWorkers 4",
     "typecheck": "tsc --noEmit"
   },
-  "author": "Accuknox",
+  "author": "KubeArmor",
   "license": "Apache-2.0",
   "devDependencies": {
     "@babel/core": "^7.21.4",
