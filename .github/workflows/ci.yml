@@ -180,7 +180,7 @@ jobs:
   #     - name: Docker logs
   #       if: ${{ always() && steps.run-tests.outcome == 'failure' }}
   #       run: |
-  #         docker logs accuknox-kubearmor-datasource >& grafana-server.log
+  #         docker logs kubearmor-datasource >& grafana-server.log
   #
   #     - name: Stop grafana docker
   #       run: docker-compose down

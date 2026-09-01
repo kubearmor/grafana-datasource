@@ -1,7 +1,7 @@
 services:
   grafana:
     user: root
-    container_name: 'accuknox-kubearmor-datasource'
+    container_name: 'kubearmor-datasource'
 
     platform: 'linux/amd64'
     build:
@@ -19,16 +19,16 @@ services:
     cap_add:
       - SYS_PTRACE
     volumes:
-      - ./dist:/var/lib/grafana/plugins/accuknox-kubearmor-datasource
+      - ./dist:/var/lib/grafana/plugins/kubearmor-datasource
       - ./provisioning:/etc/grafana/provisioning
-      - .:/root/accuknox-kubearmor-datasource
+      - .:/root/kubearmor-datasource
 
     environment:
       NODE_ENV: development
-      GF_LOG_FILTERS: plugin.accuknox-kubearmor-datasource:debug
+      GF_LOG_FILTERS: plugin.kubearmor-datasource:debug
       GF_LOG_LEVEL: debug
       GF_DATAPROXY_LOGGING: 1
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: accuknox-kubearmor-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: kubearmor-datasource
   # elasticsearch:
   #   user: root
   #   image: docker.elastic.co/elasticsearch/elasticsearch-oss:7.0.1

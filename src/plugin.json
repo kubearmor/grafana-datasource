@@ -2,22 +2,21 @@
   "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
   "type": "datasource",
   "name": "Kubearmor",
-  "id": "accuknox-kubearmor-datasource",
+  "id": "kubearmor-datasource",
   "metrics": true,
   "backend": true,
   "executable": "gpx_kubearmor",
   "info": {
     "description": "A backend datasource for kubearmor",
     "author": {
-      "name": "Accuknox",
-      "url":"https://www.accuknox.com"
+      "name": "KubeArmor",
+      "url":"https://www.kubearmor.io"
     },
     "keywords": [
       "datasource",
       "kubearmor",
-      "kube",
-      "accu",
-      "accuknox"
+      "kubernetes",
+      "grafana"
     ],
     "logos": {
       "small": "img/kubearmor-logo-symbol.svg",
@@ -26,7 +25,7 @@
     "links": [
       {
         "name": "Website",
-        "url": "https://www.accuknox.com"
+        "url": "https://www.kubearmor.io"
       }
     ],
     "screenshots": [

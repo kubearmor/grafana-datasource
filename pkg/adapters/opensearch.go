@@ -9,10 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/accuknox/kubearmor/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
+	"github.com/kubearmor/grafana-datasource/pkg/models"
 	opensearch "github.com/opensearch-project/opensearch-go"
 	"github.com/opensearch-project/opensearch-go/opensearchapi"
 )

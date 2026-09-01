@@ -7,14 +7,14 @@ import (
 
 	"net/http"
 
-	"github.com/accuknox/kubearmor/pkg/adapters"
-	"github.com/accuknox/kubearmor/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/kubearmor/KubeArmor/KubeArmor/types"
+	"github.com/kubearmor/grafana-datasource/pkg/adapters"
+	"github.com/kubearmor/grafana-datasource/pkg/models"
 )
 
 var (

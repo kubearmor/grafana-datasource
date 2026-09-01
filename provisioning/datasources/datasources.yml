@@ -2,7 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: 'kubearmor'
-    type: 'accuknox-kubearmor-datasource'
+    type: 'kubearmor-datasource'
     access: proxy
     isDefault: false
     orgId: 1
